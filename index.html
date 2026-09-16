@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monocórdio de Pitágoras - Lab Física Pro</title>
+    <!-- SheetJS (Community Edition) - usado só para montar o .xlsx do relatório do quiz -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -335,6 +337,111 @@ let acertos = 0;
 let respostas_usuario = new Array(perguntas.length).fill(null);
 let quiz_concluido = false;
 let modo_revisao = false;
+
+// --- RELATÓRIO DO QUIZ (geração de .xlsx e envio por e-mail) ---
+// Guarda só os dados do RESULTADO em si, capturados no momento em que o quiz
+// termina. Nome do aluno e e-mail do professor NÃO entram aqui: eles só são
+// pedidos na hora do envio (via prompt) e nunca ficam salvos no código, por
+// questão de ética/privacidade.
+let dataHoraConclusaoQuiz = null;
+let resultadoQuizAtual = null;
+let relatorioEstado = { enviando: false, sucesso: false, erro: false, mensagem: '' };
+
+// Captura, no instante em que o quiz é concluído, os dados do resultado que
+// vão para o relatório (acertos, pontuação, total de perguntas, respostas
+// dadas e data/hora). É chamada nos dois pontos onde quiz_concluido vira true.
+function capturarResultadoQuiz() {
+    dataHoraConclusaoQuiz = new Date();
+    resultadoQuizAtual = {
+        acertos: acertos,
+        pontuacao_total: pontuacao_total,
+        total_perguntas: perguntas.length,
+        respostas_usuario: respostas_usuario.slice(),
+        dataHora: dataHoraConclusaoQuiz
+    };
+}
+
+// Monta o .xlsx do resultado (SheetJS) e envia por e-mail via FormSubmit.co.
+// Nome do aluno e e-mail do professor são coletados aqui mesmo, na hora do
+// envio, e usados só localmente nesta função — não são gravados em nenhuma
+// variável global nem persistidos.
+async function enviarRelatorioQuiz() {
+    if (relatorioEstado.enviando || !resultadoQuizAtual) return;
+
+    let nomeAluno = window.prompt("Nome do aluno (para constar no relatório):", "");
+    if (nomeAluno === null) return; // usuário cancelou
+    let emailProfessor = window.prompt("E-mail do professor (para envio do relatório):", "");
+    if (emailProfessor === null) return; // usuário cancelou
+
+    nomeAluno = nomeAluno.trim() || "Aluno não identificado";
+    emailProfessor = emailProfessor.trim();
+    if (!emailProfessor) {
+        relatorioEstado = { enviando: false, sucesso: false, erro: true, mensagem: 'E-mail do professor não informado.' };
+        return;
+    }
+
+    relatorioEstado = { enviando: true, sucesso: false, erro: false, mensagem: '' };
+
+    try {
+        let r = resultadoQuizAtual;
+        let dataHoraTexto = r.dataHora.toLocaleString('pt-BR');
+
+        // 1-2) Dados do resultado organizados como matriz de linhas (aoa).
+        let linhas = [
+            ["Relatório de Resultado - Quiz de Física (Monocórdio de Pitágoras)"],
+            [],
+            ["Nome do Aluno", nomeAluno],
+            ["Data/Hora de Conclusão", dataHoraTexto],
+            ["Pontuação Total", r.pontuacao_total],
+            ["Total de Acertos", `${r.acertos} / ${r.total_perguntas}`],
+            [],
+            ["Nº", "Pergunta", "Resposta do Aluno", "Resposta Correta", "Resultado"]
+        ];
+
+        for (let i = 0; i < perguntas.length; i++) {
+            let p = perguntas[i];
+            let idxResp = r.respostas_usuario[i];
+            let respAlunoTexto = (idxResp !== null && idxResp !== undefined) ? p.alternativas[idxResp] : "Não respondida";
+            let respCorretaTexto = p.alternativas[p.resposta_correta];
+            let resultadoTexto = (idxResp === p.resposta_correta) ? "Correta" : "Incorreta";
+            linhas.push([i + 1, p.pergunta, respAlunoTexto, respCorretaTexto, resultadoTexto]);
+        }
+
+        // 3) Matriz -> planilha -> pasta de trabalho -> .xlsx em memória.
+        let ws = XLSX.utils.aoa_to_sheet(linhas);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Resultado");
+        let wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+        // 4) Resultado -> Blob/File -> FormData.
+        let blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        let nomeArquivo = `relatorio_quiz_${r.dataHora.getTime()}.xlsx`;
+        let arquivo = new File([blob], nomeArquivo, { type: blob.type });
+
+        let formData = new FormData();
+        formData.append('_subject', `Relatório do Quiz de Física - ${nomeAluno}`);
+        formData.append('_captcha', 'false');
+        formData.append('_template', 'table');
+        formData.append('nome_aluno', nomeAluno);
+        formData.append('pontuacao_total', String(r.pontuacao_total));
+        formData.append('acertos', `${r.acertos}/${r.total_perguntas}`);
+        formData.append('data_hora', dataHoraTexto);
+        formData.append('attachment', arquivo, nomeArquivo);
+
+        // 5) fetch() para o FormSubmit.co com redirect manual (evita navegar
+        // para a página de agradecimento do FormSubmit e evita erro de CORS
+        // ao tentar ler o redirecionamento).
+        await fetch(`https://formsubmit.co/${encodeURIComponent(emailProfessor)}`, {
+            method: 'POST',
+            body: formData,
+            redirect: 'manual'
+        });
+
+        relatorioEstado = { enviando: false, sucesso: true, erro: false, mensagem: '' };
+    } catch (err) {
+        relatorioEstado = { enviando: false, sucesso: false, erro: true, mensagem: 'Falha ao enviar o relatório.' };
+    }
+}
 
 // --- INPUTS ---
 let keys = {};
@@ -1849,11 +1956,13 @@ function loop(timestamp) {
         else if (acertos >= 12) feedback_msg = "Muito bem! Excelente aprendizado!";
         drawText(feedback_msg, quiz_x + s(40), box_res_y + s(160), `italic ${s(16.1)}px sans-serif`, COLOR_TEXT_MUTED);
 
-        let btn_y1 = s(310), btn_y2 = s(365), btn_w = WIDTH - quiz_x - s(40);
+        let btn_y1 = s(310), btn_y2 = s(365), btn_y3 = s(420), btn_w = WIDTH - quiz_x - s(40);
         let hover_revisar = pointInRect(mouseX, mouseY, quiz_x + s(20), btn_y1, btn_w, s(40));
         let hover_refazer = pointInRect(mouseX, mouseY, quiz_x + s(20), btn_y2, btn_w, s(40));
+        let hover_enviar = pointInRect(mouseX, mouseY, quiz_x + s(20), btn_y3, btn_w, s(40));
         let hoverRevisarT = hoverT('quizRevisar', hover_revisar);
         let hoverRefazerT = hoverT('quizRefazer', hover_refazer);
+        let hoverEnviarT = hoverT('quizEnviarRelatorio', hover_enviar);
 
         fillRect(quiz_x + s(20), btn_y1, btn_w, s(40), lerpColor(COLOR_QUIZ_ACCENT_SOFT, COLOR_QUIZ_ACCENT, hoverRevisarT), s(8));
         strokeRect(quiz_x + s(20), btn_y1, btn_w, s(40), COLOR_QUIZ_ACCENT, s(1.5), s(8));
@@ -1862,13 +1971,30 @@ function loop(timestamp) {
         fillRect(quiz_x + s(20), btn_y2, btn_w, s(40), lerpColor("rgba(16, 185, 129, 0.18)", COLOR_CORRECT, hoverRefazerT), s(8));
         strokeRect(quiz_x + s(20), btn_y2, btn_w, s(40), COLOR_CORRECT, s(1.5), s(8));
         drawText("Refazer Novo Quiz", quiz_x + s(20) + btn_w/2, btn_y2 + s(25), `bold ${s(17.25)}px sans-serif`, lerpColor(COLOR_CORRECT, "#ffffff", hoverRefazerT), "center");
-        
+
+        // Botão "Enviar Relatório" — gera o .xlsx do resultado e dispara o
+        // envio por e-mail (FormSubmit.co). Mesmo estilo visual dos outros
+        // dois botões da tela de resultado, só que na cor de destaque âmbar
+        // já usada no restante do app (COLOR_GOLD), pra diferenciar a ação.
+        let corBaseEnviar = relatorioEstado.enviando ? "rgba(180, 83, 9, 0.35)" : "rgba(180, 83, 9, 0.18)";
+        fillRect(quiz_x + s(20), btn_y3, btn_w, s(40), lerpColor(corBaseEnviar, COLOR_GOLD, hoverEnviarT), s(8));
+        strokeRect(quiz_x + s(20), btn_y3, btn_w, s(40), COLOR_GOLD, s(1.5), s(8));
+        let textoEnviar = "Enviar Relatório";
+        if (relatorioEstado.enviando) textoEnviar = "Enviando...";
+        else if (relatorioEstado.sucesso) textoEnviar = "Relatório Enviado!";
+        else if (relatorioEstado.erro) textoEnviar = "Falha no Envio — Tentar de Novo";
+        drawText(textoEnviar, quiz_x + s(20) + btn_w/2, btn_y3 + s(25), `bold ${s(17.25)}px sans-serif`, lerpColor(COLOR_GOLD, "#ffffff", hoverEnviarT), "center");
+
         if (currentState === APP_STATE.SIMULADOR && mouseClicked) {
-            if (hover_revisar) { modo_revisao = true; indice_pergunta = 0; } 
+            if (hover_revisar) { modo_revisao = true; indice_pergunta = 0; }
             else if (hover_refazer) {
                 pontuacao_total = 0; acertos = 0; indice_pergunta = 0;
                 opcao_selecionada = null; tentativas_questao = 0;
                 respostas_usuario.fill(null); quiz_concluido = false; modo_revisao = false;
+                dataHoraConclusaoQuiz = null; resultadoQuizAtual = null;
+                relatorioEstado = { enviando: false, sucesso: false, erro: false, mensagem: '' };
+            } else if (hover_enviar && !relatorioEstado.enviando) {
+                enviarRelatorioQuiz();
             }
         }
 
@@ -1977,7 +2103,7 @@ function loop(timestamp) {
                 drawText(txt_prox, btn_prox_x + btn_w/2, btn_y + s(25), `bold ${s(17.25)}px sans-serif`, lerpColor(COLOR_TEXT, "#ffffff", h_proxT), "center");
                 if (mouseClicked && h_prox) {
                     if (indice_pergunta < perguntas.length - 1) indice_pergunta++;
-                    else { modo_revisao = false; quiz_concluido = true; }
+                    else { modo_revisao = false; quiz_concluido = true; capturarResultadoQuiz(); }
                 }
             } else {
                 let btn_prox_y = HEIGHT - s(70), btn_prox_w = WIDTH - quiz_x - s(40);
@@ -1988,8 +2114,8 @@ function loop(timestamp) {
                 strokeRect(quiz_x + s(20), btn_prox_y, btn_prox_w, s(40), COLOR_QUIZ_ACCENT, s(1.5), s(8));
                 drawText(texto_botao, quiz_x + s(20) + btn_prox_w/2, btn_prox_y + s(25), `bold ${s(18.4)}px sans-serif`, lerpColor(COLOR_QUIZ_ACCENT, "#ffffff", btn_hoverT), "center");
                 if (currentState === APP_STATE.SIMULADOR && mouseClicked && btn_hover) {
-                    if (indice_pergunta < perguntas.length - 1) { indice_pergunta++; opcao_selecionada = null; tentativas_questao = 0; } 
-                    else { quiz_concluido = true; }
+                    if (indice_pergunta < perguntas.length - 1) { indice_pergunta++; opcao_selecionada = null; tentativas_questao = 0; }
+                    else { quiz_concluido = true; capturarResultadoQuiz(); }
                 }
             }
         }
