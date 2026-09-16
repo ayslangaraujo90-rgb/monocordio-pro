@@ -176,7 +176,7 @@ const PASSO_INSTRUCOES_LISTA = [
     },
     {
         titulo: "4. Quiz de Física e Teclado",
-        texto: "No painel à direita, teste seus conhecimentos respondendo a 20 questões interativas sobre acústica e física ondulatória. Ganhe pontuação extra ao acertar de primeira!",
+        texto: "No painel à direita, teste seus conhecimentos respondendo a 11 questões interativas sobre acústica e física ondulatória. ",
         foco: "quiz",
         dica: "Dica: Responda atentamente para somar pontos e dominar a física do monocórdio."
     }
@@ -297,19 +297,19 @@ const perguntas = [
         pergunta: "Se a velocidade da onda na corda é de 1000 m/s e o comprimento ajustado é L = 0,50 m, qual é a frequência fundamental (1º harmônico)?",
         alternativas: ["a) 500 Hz", "b) 1000 Hz", "c) 2000 Hz"],
         resposta_correta: 1,
-        explicacao: "A frequência do 1º harmônico é dada por f = v / (2L) = 1000 / (2 x 0,50) = 1000 Hz."
+        explicacao: "A frequência do 1º harmônico é dada por\nf = v / (2L) = 1000 / (2 x 0,50) = 1000 Hz."
     },
     {
         pergunta: "No gráfico de Amplitude por Tempo t (s), se uma oscilação completa (1 ciclo) ocorre em 0,002 s, qual é a frequência dessa onda?",
         alternativas: ["a) 200 Hz", "b) 500 Hz", "c) 1000 Hz"],
         resposta_correta: 1,
-        explicacao: "A frequência é o inverso do período (f = 1 / T). Se T = 0,002 s, então f = 1 / 0,002 = 500 Hz."
+        explicacao: "A frequência é o inverso do período\n(f = 1 / T). Se T = 0,002 s, então f = 1 / 0,002 = 500 Hz."
     },
     {
         pergunta: "Sabendo que a velocidade da onda na corda é 800 m/s e a frequência emitida é f = 400 Hz, qual o comprimento de onda (λ)?",
         alternativas: ["a) 2,0 m", "b) 0,5 m", "c) 3,2 m"],
         resposta_correta: 0,
-        explicacao: "Usando a equação fundamental das ondas v = λ . f => λ = v / f = 800 / 400 = 2,0 m."
+        explicacao: "Usando a equação fundamental das ondas\nv = λ . f => λ = v / f = 800 / 400 = 2,0 m."
     },
     {
         pergunta: "Ao analisar o primeiro gráfico 'λ (m)', se o ciclo completo da onda se encerra na marca de 0,48 m, isso significa que:",
@@ -321,7 +321,7 @@ const perguntas = [
         pergunta: "No gráfico de tempo t (s), se visualizamos exatamente 5 ciclos completos no intervalo de 0,010 s, qual o período de cada ciclo?",
         alternativas: ["a) 0,002 s", "b) 0,005 s", "c) 0,010 s"],
         resposta_correta: 0,
-        explicacao: "O período T é a duração de 1 ciclo: T = tempo total / número de ciclos = 0,010 / 5 = 0,002 s."
+        explicacao: "O período T é a duração de 1 ciclo:\nT = tempo total / número de ciclos = 0,010 / 5 = 0,002 s."
     }
 ];
 
@@ -732,27 +732,34 @@ function wrapTextExplicacao(text, x, y, maxWidth, lineHeight, font, color) {
     // partida entre duas linhas.
     let textoProtegido = text.replace(/√\([^)]*\)/g, m => m.replace(/ /g, ' '));
 
-    let words = textoProtegido.split(' ');
-    let lines = []; let line = '';
-    for (let n = 0; n < words.length; n++) {
-        let word = words[n];
-        let testLine = line + word + ' ';
-        let metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && n > 0) {
-            if (word === '=' || word === '=>') {
-                // O "=" não coube: em vez de empurrá-lo sozinho para a
-                // próxima linha, ele fica no final da linha atual.
-                lines.push(line + word);
-                line = '';
+    // Uma quebra de linha manual ("\n") no texto força o início de uma nova
+    // linha exatamente naquele ponto, antes de aplicar a quebra automática
+    // por largura em cada trecho separadamente.
+    let paragrafos = textoProtegido.split('\n');
+    let lines = [];
+    for (let p = 0; p < paragrafos.length; p++) {
+        let words = paragrafos[p].split(' ');
+        let line = '';
+        for (let n = 0; n < words.length; n++) {
+            let word = words[n];
+            let testLine = line + word + ' ';
+            let metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
+                if (word === '=' || word === '=>') {
+                    // O "=" não coube: em vez de empurrá-lo sozinho para a
+                    // próxima linha, ele fica no final da linha atual.
+                    lines.push(line + word);
+                    line = '';
+                } else {
+                    lines.push(line);
+                    line = word + ' ';
+                }
             } else {
-                lines.push(line);
-                line = word + ' ';
+                line = testLine;
             }
-        } else {
-            line = testLine;
         }
+        lines.push(line);
     }
-    lines.push(line);
 
     let currentY = y;
     let fontSizePx = parseFloat(font.match(/(\d+(\.\d+)?)px/)[1]);
