@@ -17,11 +17,309 @@
         canvas {
             display: block;
         }
+
+        /* ================================================================
+           BOTÃO "EQUAÇÕES ÚTEIS" E JANELA DE EQUAÇÕES
+           (Adicionado sem alterar nenhum estilo pré-existente acima)
+           ================================================================ */
+        #btnEquacoesUteis {
+            position: fixed;
+            top: 10px;
+            right: 380px; /* valor inicial; reposicionado dinamicamente via JS */
+            z-index: 500;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: 1.5px solid rgba(29, 64, 175, 0.35);
+            background: linear-gradient(180deg, rgba(238,242,255,0.97), rgba(199,210,254,0.95));
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-weight: 700;
+            font-size: 13.5px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(30,41,59,0.18);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+            user-select: none;
+        }
+        #btnEquacoesUteis:hover {
+            background: linear-gradient(180deg, rgba(199,210,254,0.98), rgba(165,180,252,0.97));
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(30,41,59,0.24);
+        }
+        #btnEquacoesUteis .icone-eq {
+            font-size: 15px;
+        }
+        /* Durante o tutorial, o botão fica escurecido (na mesma tonalidade do
+           restante da tela, que recebe uma camada escura de overlay) e só
+           recupera o brilho normal no passo em que sua função é demonstrada. */
+        #btnEquacoesUteis.btn-eq-escurecido {
+            background: rgba(30, 41, 59, 0.55);
+            border-color: rgba(148, 163, 184, 0.35);
+            color: rgba(226, 232, 240, 0.75);
+            box-shadow: none;
+        }
+        #btnEquacoesUteis.btn-eq-escurecido:hover {
+            background: rgba(30, 41, 59, 0.55);
+            transform: none;
+            box-shadow: none;
+        }
+
+        #overlayEquacoesUteis {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(2px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        #overlayEquacoesUteis.aberto {
+            display: flex;
+        }
+        #modalEquacoesUteis {
+            background: rgba(255,255,255,0.98);
+            border: 1.5px solid rgba(67,56,202,0.28);
+            border-radius: 16px;
+            max-width: 640px;
+            width: 100%;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 60px rgba(15,23,42,0.35);
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .modal-eq-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 22px;
+            background: linear-gradient(180deg, #eef1fc, #dde3f7);
+            border-bottom: 1.5px solid rgba(67,56,202,0.2);
+            flex-shrink: 0;
+        }
+        .modal-eq-header h2 {
+            margin: 0;
+            font-size: 18.5px;
+            color: #1d4ed8;
+        }
+        #fecharModalEquacoes {
+            border: none;
+            background: rgba(29,64,175,0.1);
+            color: #1e293b;
+            font-size: 20px;
+            line-height: 1;
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        #fecharModalEquacoes:hover {
+            background: rgba(29,64,175,0.2);
+        }
+        .modal-eq-corpo {
+            padding: 20px 22px 26px;
+            overflow-y: auto;
+        }
+        .modal-eq-intro {
+            margin: 0 0 16px;
+            color: #4b5567;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .eq-card {
+            background: rgba(238,242,255,0.6);
+            border: 1px solid rgba(67,56,202,0.18);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+        }
+        .eq-card h3 {
+            margin: 0 0 8px;
+            font-size: 14.5px;
+            color: #0f172a;
+        }
+        .eq-formula {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1d4ed8;
+            background: rgba(255,255,255,0.8);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+        .eq-card ul {
+            margin: 0;
+            padding-left: 18px;
+            color: #4b5567;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }
+        .eq-card li {
+            margin-bottom: 4px;
+        }
+        .eq-card-conceitual {
+            background: rgba(16,185,129,0.08);
+            border-color: rgba(4,120,87,0.25);
+        }
+
+        /* --- Equação de Taylor: v = raiz quadrada de (T sobre μ) ---
+           T (numerador) e μ (denominador) ficam empilhados, um sobre o
+           outro, e o símbolo de raiz é um único traço contínuo (SVG) que
+           envolve a fração inteira — gancho à esquerda e barra por cima —
+           crescendo junto com o conteúdo, sem quebras/espaços entre o
+           gancho e a barra e sem sobrepor nenhuma das duas incógnitas. */
+        .eq-formula-taylor {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 14px 12px;
+        }
+        .eq-formula-taylor .eq-taylor-v,
+        .eq-formula-taylor .eq-taylor-igual {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1d4ed8;
+        }
+        .eq-formula-taylor .eq-raiz {
+            position: relative;
+            display: inline-flex;
+            padding: 12px 6px 0 20px;
+        }
+        .eq-formula-taylor .eq-raiz-svg {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            display: block;
+        }
+        .eq-formula-taylor .eq-fracao {
+            position: relative;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1d4ed8;
+            line-height: 1.3;
+        }
+        .eq-formula-taylor .eq-fracao-num {
+            padding: 0 8px 4px;
+            border-bottom: 2.25px solid #1d4ed8;
+        }
+        .eq-formula-taylor .eq-fracao-den {
+            padding: 4px 8px 0;
+        }
+        @media (max-width: 520px) {
+            #btnEquacoesUteis span.texto-eq { display: none; }
+            #btnEquacoesUteis { padding: 10px 12px; right: 12px !important; top: auto; bottom: 16px; }
+        }
     </style>
 </head>
 <body>
 
 <canvas id="simCanvas"></canvas>
+
+<!-- ================================================================
+     BOTÃO "EQUAÇÕES ÚTEIS" (fica entre o monocórdio e o quiz durante
+     a simulação) E JANELA (modal) COM AS EQUAÇÕES DO QUIZ.
+     Elemento adicionado sem remover ou alterar nada do simulador.
+     ================================================================ -->
+<button id="btnEquacoesUteis" type="button" aria-haspopup="dialog" aria-controls="modalEquacoesUteis" title="Ver equações úteis para o quiz">
+    <span class="icone-eq">📐</span><span class="texto-eq">Equações Úteis</span>
+</button>
+
+<div id="overlayEquacoesUteis" role="presentation">
+    <div id="modalEquacoesUteis" role="dialog" aria-modal="true" aria-labelledby="tituloModalEquacoes">
+        <div class="modal-eq-header">
+            <h2 id="tituloModalEquacoes">📐 Equações Úteis do Quiz</h2>
+            <button id="fecharModalEquacoes" type="button" aria-label="Fechar">×</button>
+        </div>
+        <div class="modal-eq-corpo">
+            <p class="modal-eq-intro">Use estas equações de física ondulatória e acústica para resolver as questões do quiz sobre o monocórdio de Pitágoras.</p>
+
+            <div class="eq-card">
+                <h3>1. Equação de Taylor — velocidade da onda na corda</h3>
+                <div class="eq-formula eq-formula-taylor">
+                    <span class="eq-taylor-v">v</span>
+                    <span class="eq-taylor-igual">=</span>
+                    <span class="eq-raiz">
+                        <svg class="eq-raiz-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                            <path d="M0,56 L11,70 L27,6 L100,6" fill="none" stroke="#1d4ed8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                        </svg>
+                        <span class="eq-fracao">
+                            <span class="eq-fracao-num">T</span>
+                            <span class="eq-fracao-den">μ</span>
+                        </span>
+                    </span>
+                </div>
+                <ul>
+                    <li><strong>v</strong> — velocidade de propagação da onda na corda (m/s)</li>
+                    <li><strong>T</strong> — tração (tensão) aplicada à corda (N)</li>
+                    <li><strong>μ</strong> — densidade linear da corda (kg/m)</li>
+                </ul>
+            </div>
+
+            <div class="eq-card">
+                <h3>2. Frequência fundamental do monocórdio (1º harmônico)</h3>
+                <div class="eq-formula">f = v / (2L)</div>
+                <ul>
+                    <li><strong>f</strong> — frequência fundamental do som produzido (Hz)</li>
+                    <li><strong>v</strong> — velocidade de propagação da onda na corda (m/s)</li>
+                    <li><strong>L</strong> — comprimento vibrante da corda, entre os cavaletes (m)</li>
+                </ul>
+            </div>
+
+            <div class="eq-card">
+                <h3>3. Equação fundamental da ondulatória</h3>
+                <div class="eq-formula">v = λ · f</div>
+                <ul>
+                    <li><strong>v</strong> — velocidade de propagação da onda (m/s)</li>
+                    <li><strong>λ</strong> — comprimento de onda (m)</li>
+                    <li><strong>f</strong> — frequência da onda (Hz)</li>
+                </ul>
+            </div>
+
+            <div class="eq-card">
+                <h3>4. Relação entre frequência e período</h3>
+                <div class="eq-formula">f = 1 / T</div>
+                <ul>
+                    <li><strong>f</strong> — frequência da onda (Hz)</li>
+                    <li><strong>T</strong> — período: tempo de uma oscilação completa (s)</li>
+                </ul>
+            </div>
+
+            <div class="eq-card">
+                <h3>5. Período a partir do número de ciclos</h3>
+                <div class="eq-formula">T = Δt / n</div>
+                <ul>
+                    <li><strong>T</strong> — período de cada ciclo (s)</li>
+                    <li><strong>Δt</strong> — intervalo de tempo total observado no gráfico (s)</li>
+                    <li><strong>n</strong> — número de ciclos completos observados nesse intervalo</li>
+                </ul>
+            </div>
+
+            <div class="eq-card eq-card-conceitual">
+                <h3>Lembrete conceitual</h3>
+                <ul>
+                    <li><strong>Frequência</strong> → define a <strong>altura</strong> do som (grave ou agudo)</li>
+                    <li><strong>Amplitude</strong> → define a <strong>intensidade/volume</strong> do som (fraco ou forte), sem alterar se ele é grave ou agudo</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 // ---------- CONFIGURAÇÕES BASE ----------
@@ -179,6 +477,12 @@ const PASSO_INSTRUCOES_LISTA = [
         texto: "No painel à direita, teste seus conhecimentos respondendo a 11 questões interativas sobre acústica e física ondulatória. ",
         foco: "quiz",
         dica: "Dica: Responda atentamente para somar pontos e dominar a física do monocórdio."
+    },
+    {
+        titulo: "5. Botão de Equações Úteis",
+        texto: "Entre o monocórdio e o quiz fica o botão \"📐 Equações Úteis\". Clique nele para abrir uma janela com as fórmulas do quiz e o significado de cada incógnita.",
+        foco: "equacoes",
+        dica: "Dica: Use-o sempre que tiver dúvida sobre qual equação aplicar."
     }
 ];
 
@@ -2149,6 +2453,14 @@ function loop(timestamp) {
             strokeRect(barra_x_1 - s(10), barra_y - barra_height - s(10), barra_x_3 + barra_width - barra_x_1 + s(50), barra_height + s(40), NEON_CYAN, s(3.5), s(12));
         } else if (pInfo.foco === "quiz") {
             strokeRect(quiz_x - s(5), 0, WIDTH - quiz_x + s(5), HEIGHT, NEON_CYAN, s(3.5));
+        } else if (pInfo.foco === "equacoes") {
+            // Destaca o botão real "Equações Úteis" (elemento HTML) usando sua posição
+            // exata na tela, sem depender de coordenadas fixas do canvas.
+            let btnEqDestaque = document.getElementById('btnEquacoesUteis');
+            if (btnEqDestaque) {
+                let retEq = btnEqDestaque.getBoundingClientRect();
+                strokeRect(retEq.left - s(8), retEq.top - s(8), retEq.width + s(16), retEq.height + s(16), NEON_CYAN, s(3.5), s(12));
+            }
         }
         ctx.restore();
 
@@ -2219,6 +2531,71 @@ function loop(timestamp) {
 }
 
 requestAnimationFrame(loop);
+</script>
+
+<!-- ================================================================
+     SCRIPT DO BOTÃO/JANELA "EQUAÇÕES ÚTEIS".
+     Completamente independente do script principal acima: não altera,
+     remove nem redefine nenhuma variável ou função já existente — apenas
+     lê (leitura) as variáveis globais currentState, APP_STATE e a função
+     s() já criadas pelo simulador para saber quando mostrar o botão e
+     onde posicioná-lo (entre o monocórdio e o quiz).
+     ================================================================ -->
+<script>
+(function () {
+    const btnEquacoes = document.getElementById('btnEquacoesUteis');
+    const overlayEquacoes = document.getElementById('overlayEquacoesUteis');
+    const fecharEquacoes = document.getElementById('fecharModalEquacoes');
+
+    function abrirModalEquacoes() {
+        overlayEquacoes.classList.add('aberto');
+    }
+    function fecharModalEquacoes() {
+        overlayEquacoes.classList.remove('aberto');
+    }
+
+    btnEquacoes.addEventListener('click', abrirModalEquacoes);
+    fecharEquacoes.addEventListener('click', fecharModalEquacoes);
+    overlayEquacoes.addEventListener('click', function (e) {
+        if (e.target === overlayEquacoes) fecharModalEquacoes();
+    });
+    window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') fecharModalEquacoes();
+    });
+
+    // Mantém o botão visível durante a simulação (quando o quiz está na
+    // tela) e também durante o tutorial guiado, posicionando-o
+    // dinamicamente na faixa entre o monocórdio e o painel do quiz,
+    // acompanhando o redimensionamento. Durante o tutorial, o botão fica
+    // escurecido (como o resto da tela, sob o overlay escuro) e só recupera
+    // o brilho normal no passo que demonstra sua função (foco "equacoes").
+    function posicionarBotaoEquacoes() {
+        try {
+            if (typeof currentState !== 'undefined' && typeof APP_STATE !== 'undefined' &&
+                (currentState === APP_STATE.SIMULADOR || currentState === APP_STATE.INSTRUCOES)) {
+                btnEquacoes.style.display = 'flex';
+                let larguraPainelQuiz = s(350);
+                btnEquacoes.style.right = (larguraPainelQuiz + 14) + 'px';
+
+                if (currentState === APP_STATE.INSTRUCOES &&
+                    typeof PASSO_INSTRUCOES_LISTA !== 'undefined' &&
+                    typeof passoInstrucoes !== 'undefined') {
+                    let passoAtual = PASSO_INSTRUCOES_LISTA[passoInstrucoes];
+                    let estaSendoDemonstrado = passoAtual && passoAtual.foco === 'equacoes';
+                    btnEquacoes.classList.toggle('btn-eq-escurecido', !estaSendoDemonstrado);
+                } else {
+                    btnEquacoes.classList.remove('btn-eq-escurecido');
+                }
+            } else {
+                btnEquacoes.style.display = 'none';
+            }
+        } catch (err) {
+            // Se algo ainda não estiver inicializado no primeiro frame, apenas tenta de novo.
+        }
+        requestAnimationFrame(posicionarBotaoEquacoes);
+    }
+    requestAnimationFrame(posicionarBotaoEquacoes);
+})();
 </script>
 </body>
 </html>
